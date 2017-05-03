@@ -22,7 +22,8 @@ spdata <- as.data.frame(stockdata$data)
 names(spdata) <- stockinfo$Ticker
 spts <- xts(spdata, order.by = as.Date(as.numeric(row.names(spdata))))
 
-
+# color theme
+cols <- c('#0099cc', '#ccffcc')
 ##########################
 # Sector Comparison
 ##########################
@@ -166,7 +167,7 @@ t.test(worst2, c.returns2)
 # Model vs. Historical VaR
 ##########################
 
-
+library(ggplot2)
 set.seed(2342)
 
 # select 3 stocks for analysis
@@ -187,32 +188,52 @@ hvar <- function (x, confidence = 0.95) {
   sort(as.vector(x))[round(length(x) * (1 - confidence), 0)]
 }
 
-# plot VaR under normal assumption
+# plot VaR types
 plotVaR <- function (x, confidence = c(0.95, 0.995)) {
   modelVaR <- mvar(x, confidence)
   histVaR <- hvar(x, confidence)
   
   m <- mean(x)
   vol <- sd(x)
+  nmod <- function (x) dnorm(x, mean = m, sd = vol)
   
-  plot(density(x), col = '#0099cc', lwd = 1.3)
-  curve(dnorm(x, mean = m, sd = vol), from = -0.1, to = 0.1, add = TRUE, lwd = 1.3)
+  # plot labels
+  cols <- c('purple', '#FF00FF')
+  hLabels <- paste(as.character(round(histVaR, 4) * 100), '%', sep = ' ')
+  mLabels <- paste(as.character(round(modelVaR, 4) * 100), '%', sep = ' ')
+  labels <- seq(from = -0.1, to = 0.1, by = 0.025)
+  labels <- append(labels, histVaR)
+  labels <- append(labels, modelVaR)
+  labels <- sort(labels)
   
-  cols = heat.colors(length(confidence))
+  # plot densities
+  ggplot(x, aes(x, col = 'red', fill = 'red')) + 
+  labs(title = 'Value at Risk', subtitle = 'Historical vs. Model') +
+    
+  # the historical return denisty
+  geom_density(alpha = 0.2, size = 1, col = cols[1], fill = cols[1], linetype = 2) +
   
-  # plot model VaR
-  abline(v = modelVaR, 
-         lwd = 2, 
-         col = cols,
-         lty = 'solid')
+  # the model density
+  stat_function(fun = nmod, alpha = 0.2, size = 1, col = cols[2], fill = cols[2], geom = 'area') +
   
+  # historical VaR
+  geom_vline(xintercept = histVaR, linetype = 2, size = 1.3, col = cols) +
+  annotate('text', x = histVaR, y = 30, label = hLabels, angle = 90) +
   
-  # plot historical VaR
-  abline(v = histVaR, 
-         lwd = 2, 
-         col = cols,
-         lty = 'dashed')
+  # model VaR
+  geom_vline(xintercept = modelVaR, size = 1.3, col = cols) +
+  annotate('text', x = modelVaR, y = 20, label = mLabels, angle = 90) +
+  
+  ylab('Density of Returns') +
+  xlab('% Return') +
+  xlim(qnorm(0.0001, mean = m, sd = vol), qnorm(0.9999, mean = m, sd = vol)) +
+  scale_x_continuous(breaks = labels, labels = round(labels * 100, 2)) +
+  scale_color_manual(name = 'VaR Type', values = c(Historical = cols[1], Model = cols[2])) +
+  theme_light()
 }
-
+  
 plotVaR(smp[,1])
+plotVaR(smp[,2])
+plotVaR(smp[,3])
+
 
