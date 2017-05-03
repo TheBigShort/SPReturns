@@ -149,7 +149,7 @@ t.test(best2, c.returns2)
 # Worst Performers and Momentum
 ##########################
 
-worst <- sort(c.returns)[1:20]
+worst <- sort(c.returns)[1:5]
 worst
 
 worst2 <- c.returns2[names(worst)]
@@ -158,3 +158,61 @@ worst2
 # there is not enough evidence to reject the null
 # that the worst past performers will perform the same as the market
 t.test(worst2, c.returns2)
+
+
+
+
+##########################
+# Model vs. Historical VaR
+##########################
+
+
+set.seed(2342)
+
+# select 3 stocks for analysis
+names <- as.character(stockinfo[sample(nrow(stockinfo), 3),'Ticker'])
+smp <- sp.returns[,names]
+names
+
+# model VaR
+mvar <- function (x, confidence = 0.95) {
+  m <- mean(x)
+  v <- sd(x)
+  
+  qnorm(p = 1 - confidence, mean = m, sd = v)
+}
+
+# historical VaR
+hvar <- function (x, confidence = 0.95) {
+  sort(as.vector(x))[round(length(x) * (1 - confidence), 0)]
+}
+
+# plot VaR under normal assumption
+plotVaR <- function (x, confidence = c(0.95, 0.995)) {
+  modelVaR <- mvar(x, confidence)
+  histVaR <- hvar(x, confidence)
+  
+  m <- mean(x)
+  vol <- sd(x)
+  
+  plot(density(x), col = '#0099cc', lwd = 1.3)
+  curve(dnorm(x, mean = m, sd = vol), from = -0.1, to = 0.1, add = TRUE, lwd = 1.3)
+  
+  cols = heat.colors(length(confidence))
+  
+  # plot model VaR
+  abline(v = modelVaR, 
+         lwd = 2, 
+         col = cols,
+         lty = 'solid')
+  
+  
+  # plot historical VaR
+  abline(v = histVaR, 
+         lwd = 2, 
+         col = cols,
+         lty = 'dashed')
+}
+
+plotVaR(smp[,1])
+
