@@ -189,7 +189,7 @@ hvar <- function (x, confidence = 0.95) {
 }
 
 # plot VaR types
-plotVaR <- function (x, confidence = c(0.95, 0.995)) {
+plotVaR <- function (x, confidence = c(0.95, 0.995), ticker = '') {
   modelVaR <- mvar(x, confidence)
   histVaR <- hvar(x, confidence)
   
@@ -199,6 +199,7 @@ plotVaR <- function (x, confidence = c(0.95, 0.995)) {
   
   # plot labels
   cols <- c('purple', '#FF00FF')
+  title <- paste('Value at Risk', ticker, sep = ' ')
   hLabels <- paste(as.character(round(histVaR, 4) * 100), '%', sep = ' ')
   mLabels <- paste(as.character(round(modelVaR, 4) * 100), '%', sep = ' ')
   labels <- seq(from = -0.1, to = 0.1, by = 0.025)
@@ -208,7 +209,7 @@ plotVaR <- function (x, confidence = c(0.95, 0.995)) {
   
   # plot densities
   ggplot(x, aes(x, col = 'red', fill = 'red')) + 
-  labs(title = 'Value at Risk', subtitle = 'Historical vs. Model') +
+  labs(title = title, subtitle = 'Historical vs. Model') +
     
   # the historical return denisty
   geom_density(alpha = 0.2, size = 1, col = cols[1], fill = cols[1], linetype = 2) +
@@ -232,8 +233,31 @@ plotVaR <- function (x, confidence = c(0.95, 0.995)) {
   theme_light()
 }
   
-plotVaR(smp[,1])
-plotVaR(smp[,2])
-plotVaR(smp[,3])
+plotVaR(smp[,1], ticker = names(smp)[1])
+plotVaR(smp[,2], ticker = names(smp)[2])
+plotVaR(smp[,3], ticker = names(smp)[3])
 
 
+# rolling model VaR
+rollingVaR <- function (v, confidence) {
+  df <- as.data.frame(v)
+  n <- nrow(df)
+  
+  df$Vol <- c(NA, rollapply(v, FUN = sd, width = 60))[-n]
+  df$Mean <- c(NA, rollapply(v, FUN = mean, width = 60))[-n]
+  df$VaR <- qnorm((1 - confidence), mean = df$Mean, sd = df$Vol)
+  df <- head(na.omit(df), n = 300)
+  
+  # plot the returns
+  b <- plot(df[,1], ylim = c(min(df,na.rm = TRUE), max(df, na.rm = TRUE)), pch=21, bg='blue')
+  title('Rolling Model VaR')
+
+  segments(x0 = 1:nrow(df), y0 = 0,  y1 = df[,1])
+  abline(h = 0)
+  # plot the rolling VaR
+  lines(df$VaR, col = 'red', lty = 1, ylim = min(df), lwd = 2)
+}
+
+rollingVaR(smp[,1], 0.99)
+rollingVaR(smp[,2], 0.99)
+rollingVaR(smp[,3], 0.99)
