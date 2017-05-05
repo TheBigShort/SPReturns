@@ -168,7 +168,7 @@ t.test(worst2, c.returns2)
 ##########################
 
 library(ggplot2)
-set.seed(2342)
+set.seed(1)
 
 # select 3 stocks for analysis
 names <- as.character(stockinfo[sample(nrow(stockinfo), 3),'Ticker'])
@@ -238,26 +238,61 @@ plotVaR(smp[,2], ticker = names(smp)[2])
 plotVaR(smp[,3], ticker = names(smp)[3])
 
 
+
+
+library(fGarch)
+
 # rolling model VaR
-rollingVaR <- function (v, confidence) {
+rollingVaR <- function (v, confidence, days = 100) {
   df <- as.data.frame(v)
   n <- nrow(df)
+  num <- days
+  name <- names(v)[1]
   
+  # calculate the rolling VaR
   df$Vol <- c(NA, rollapply(v, FUN = sd, width = 60))[-n]
   df$Mean <- c(NA, rollapply(v, FUN = mean, width = 60))[-n]
   df$VaR <- qnorm((1 - confidence), mean = df$Mean, sd = df$Vol)
-  df <- head(na.omit(df), n = 300)
+  df <- head(na.omit(df), n = num)
+  
+  # check for losses greater than VaR
+  df$Exceed <- df[,1] < df$VaR
+  hits <- sum(df$Exceed)
+  df$Exceed[df$Exceed == TRUE] <- df[df$Exceed == TRUE,1]
+  df$Exceed[df$Exceed == FALSE] <- NA
   
   # plot the returns
-  b <- plot(df[,1], ylim = c(min(df,na.rm = TRUE), max(df, na.rm = TRUE)), pch=21, bg='blue')
-  title('Rolling Model VaR')
+  b <- plot(df[,1], 
+            ylim = c(min(df,na.rm = TRUE), max(df, na.rm = TRUE)), 
+            pch=21, 
+            bg='blue',
+            xlab = 'Trading Days', 
+            ylab = 'Return')
+  
+  title(paste('Rolling Model VaR', name, sep = ' '))
 
   segments(x0 = 1:nrow(df), y0 = 0,  y1 = df[,1])
   abline(h = 0)
+  
   # plot the rolling VaR
-  lines(df$VaR, col = 'red', lty = 1, ylim = min(df), lwd = 2)
+  lines(df$VaR, col = 'blue', lty = 1, ylim = min(df), lwd = 2)
+  points(df$Exceed, pch = 1, col = 'red', cex = 3, lwd = 2)
 }
 
-rollingVaR(smp[,1], 0.99)
-rollingVaR(smp[,2], 0.99)
-rollingVaR(smp[,3], 0.99)
+# 95% VaR
+rollingVaR(smp[,1], 0.95)
+rollingVaR(smp[,2], 0.95)
+rollingVaR(smp[,3], 0.95)
+
+# 99.9% VaR
+rollingVaR(smp[,1], 0.999, 500)
+rollingVaR(smp[,2], 0.999, 1000)
+rollingVaR(smp[,3], 0.999, 1000)
+
+# kurtosis of returns
+apply(smp, MARGIN = 2, FUN = kurtosis)
+
+# probability of witnessing an
+# event as or more extreme than the worst loss
+apply(smp, MARGIN = 2, FUN = function (x) pnorm(min(x), mean = mean(x), sd = sd(x)))
+
