@@ -7,6 +7,7 @@
 # load the sp data set
 library(huge)
 library(xts)
+library(bizdays)
 data("stockdata")
 
 # extract names and sectors
@@ -20,10 +21,16 @@ summary(stockinfo)
 # actual data
 spdata <- as.data.frame(stockdata$data)
 names(spdata) <- stockinfo$Ticker
-spts <- xts(spdata, order.by = as.Date(as.numeric(row.names(spdata))))
+
+# nyse trading days from 2003 - 2008
+cal <- create.calendar('nyse', holidays = holidayNYSE(2003:2008), weekdays = c('saturday', 'sunday'))
+days <- bizseq('2003-01-01', '2008-01-01', cal = cal)
+
+spts <- xts(spdata, order.by = days[as.numeric(row.names(spdata))])
 
 # color theme
 cols <- c('#0099cc', '#ccffcc')
+
 ##########################
 # Sector Comparison
 ##########################
@@ -39,7 +46,7 @@ sp.returns <- na.omit(CalculateReturns(spts))
 # get returns by sector
 sector.returns <- sapply(sector.names, FUN = function (name) rowMeans(sp.returns[, sector.groups[[name]][,'Ticker']]))
 colnames(sector.returns) <- gsub(' ', '.', sector.names)
-sector.returns <- xts(sector.returns, order.by = as.Date(c(1:nrow(sector.returns))))
+sector.returns <- xts(sector.returns, order.by = index(sp.returns))
 
 summary(sector.returns)
 
