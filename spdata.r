@@ -242,24 +242,38 @@ plotVaR(smp[,3], ticker = names(smp)[3])
 
 library(fGarch)
 
+exceedVaR <- function (returns, VaR) {
+  ex <- returns < VaR
+  ex[ex == TRUE] <- returns[ex == TRUE]
+  ex[ex == FALSE] <- NA
+  
+  return (ex)
+}
+
 # rolling model VaR
-rollingVaR <- function (v, confidence, days = 100) {
+rollingVaR <- function (v, confidence, days = 100, width = 60, garch = TRUE) {
   df <- as.data.frame(v)
   n <- nrow(df)
   num <- days
   name <- names(v)[1]
   
   # calculate the rolling VaR
-  df$Vol <- c(NA, rollapply(v, FUN = sd, width = 60))[-n]
-  df$Mean <- c(NA, rollapply(v, FUN = mean, width = 60))[-n]
+  df$Vol <- c(NA, rollapply(v, FUN = sd, width = width))[-n]
+  df$Mean <- c(NA, rollapply(v, FUN = mean, width = width))[-n]
   df$VaR <- qnorm((1 - confidence), mean = df$Mean, sd = df$Vol)
+  
+  # garchVaR
+  if (garch) {
+    fit <- garchFit(data = v, trace = FALSE)
+    gvol <- sqrt(fit@h.t)
+    df$GarchVaR <- qnorm((1 - confidence), mean = df$Mean, sd = gvol)
+  }
+  
+  # remove rows with VaR
   df <- head(na.omit(df), n = num)
   
   # check for losses greater than VaR
-  df$Exceed <- df[,1] < df$VaR
-  hits <- sum(df$Exceed)
-  df$Exceed[df$Exceed == TRUE] <- df[df$Exceed == TRUE,1]
-  df$Exceed[df$Exceed == FALSE] <- NA
+  df$Exceed <- exceedVaR(df[,1], df$VaR)
   
   # plot the returns
   b <- plot(df[,1], 
@@ -277,12 +291,28 @@ rollingVaR <- function (v, confidence, days = 100) {
   # plot the rolling VaR
   lines(df$VaR, col = 'blue', lty = 1, ylim = min(df), lwd = 2)
   points(df$Exceed, pch = 1, col = 'red', cex = 3, lwd = 2)
+  minor.tick(ny = 5, nx = 5)
+  
+  
+  # plot garch
+  if (garch) {
+    lines(df$GarchVaR, col = 'purple', lwd = 2)
+    
+    points(exceedVaR(df[,1],df$GarchVaR), pch = 1, col = 'orange', cex = 5, lwd = 2)
+    
+    legend('bottomright', 
+           title = 'Volatility Model', 
+           col = c('blue', 'purple'), 
+           lty = c(1, 1), 
+           lwd = c(2, 2), 
+           legend = c('Equal Weighted', 'GARCH(1,1)'))
+  }
 }
 
 # 95% VaR
-rollingVaR(smp[,1], 0.95)
-rollingVaR(smp[,2], 0.95)
-rollingVaR(smp[,3], 0.95)
+rollingVaR(smp[,1], 0.95, garch = FALSE)
+rollingVaR(smp[,2], 0.95, garch = FALSE)
+rollingVaR(smp[,3], 0.95, garch = FALSE)
 
 # 99.9% VaR
 rollingVaR(smp[,1], 0.999, 500)
