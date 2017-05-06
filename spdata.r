@@ -58,7 +58,7 @@ extrema <- function (v) {
   p.largest <- 1 - pnorm(max(v), mean = m, sd = vol)
   p.smallest <- pnorm(min(v), mean = m, sd = vol)
   
-  return(round(c(p.smallest = p.smallest, sd.smallest = sd.smallest, p.largest = p.largest, sd.largest = sd.largest), 5))
+  return(c(p.smallest = p.smallest, sd.smallest = sd.smallest, p.largest = p.largest, sd.largest = sd.largest))
 }
 
 es <- apply(sector.returns, MARGIN = 2, extrema)
@@ -95,16 +95,14 @@ barplot(ss,
 minor.tick(ny = 5, nx = 0)
 
 # rolling 20 day annualized volatility
-real.vol <- rollapply(sector.returns, width = 20, FUN = sd.annualized)
+real.vol <- rollapply(sector.returns, width = 60, FUN = sd.annualized)
 real.vol <- na.omit(real.vol)
 cv <- real.vol[,1]
 
-plot(cv)
-sample <- cv[1:300]
-vol.vol <- rollapply(sample, width = 20, FUN = sd.annualized)
+plot(cv, 
+     main = 'Consumer Discretionary Realized Volatility',
+     ylab = 'Daily Volatility')
 
-plot(sample)
-lines(vol.vol, col = 'red')
 # is realized vol stationary?
 library(tseries)
 adf.test(cv)
@@ -229,6 +227,7 @@ plotVaR <- function (x, confidence = c(0.95, 0.995), ticker = '') {
   xlab('% Return') +
   xlim(qnorm(0.0001, mean = m, sd = vol), qnorm(0.9999, mean = m, sd = vol)) +
   scale_x_continuous(breaks = labels, labels = round(labels * 100, 2)) +
+  scale_fill_manual(values = c('red', 'blue'), drop = FALSE) +
   scale_color_manual(name = 'VaR Type', values = c(Historical = cols[1], Model = cols[2])) +
   theme_light()
 }
@@ -238,10 +237,9 @@ plotVaR(smp[,2], ticker = names(smp)[2])
 plotVaR(smp[,3], ticker = names(smp)[3])
 
 
-
-
 library(fGarch)
 
+# losses that exceed VaR estimate
 exceedVaR <- function (returns, VaR) {
   ex <- returns < VaR
   ex[ex == TRUE] <- returns[ex == TRUE]
@@ -324,5 +322,9 @@ apply(smp, MARGIN = 2, FUN = kurtosis)
 
 # probability of witnessing an
 # event as or more extreme than the worst loss
-apply(smp, MARGIN = 2, FUN = function (x) pnorm(min(x), mean = mean(x), sd = sd(x)))
+smp.extreme <- apply(smp, MARGIN = 2, extrema)
+smp.extreme
+
+# view the drop associated with rolling VaR graph #3
+plot(spts[, names(smp)[3]], main = names(smp)[3])
 
