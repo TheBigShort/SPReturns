@@ -8,6 +8,7 @@
 library(huge)
 library(xts)
 library(bizdays)
+library(timeDate)
 data("stockdata")
 
 # extract names and sectors
@@ -319,3 +320,50 @@ smp.extreme
 # view the drop associated with rolling VaR graph #3
 plot(spts[, names(smp)[3]], main = names(smp)[3])
 
+
+
+monthlyReturns <- function (rets) {
+  monthly <- table.CalendarReturns(rets)
+  matr <- t(as.matrix(monthly))
+  return (as.vector(matr))
+}
+
+
+##########################
+# Top Sector and Momentum
+##########################
+
+l <- list()
+
+for (i in names(sector.returns)) {
+  l[[i]] <- monthlyReturns(sector.returns[,i])
+}
+
+sector.monthly <- as.data.frame(l)
+sector.monthly$ReturnOfMarket <- apply(sector.monthly, MARGIN = 1, mean)
+sector.monthly$Best <- colnames(sector.monthly)[apply(sector.monthly, MARGIN = 1, which.max)]
+sector.monthly$BestLastPeriod <- c(NA, sector.monthly[,'Best'])[-nrow(sector.monthly)]
+sector.monthly$ReturnOfBestLastPeriod <- rep(0, nrow(sector.monthly))
+
+for (i in 2:nrow(sector.monthly)) {
+  sector.monthly$ReturnOfBestLastPeriod[i] <- sector.monthly[i, sector.monthly$BestLastPeriod[i]]
+}
+
+sector.monthly <- na.omit(sector.monthly)
+returnMatrix <- t(as.matrix(sector.monthly[,c('ReturnOfMarket', 'ReturnOfBestLastPeriod')]))
+barplot(height = returnMatrix, 
+        beside = TRUE,
+        col = c('deepskyblue1', '#FF00FF'), 
+        legend.text = c('Market', 'Best Last Period'),
+        xlab = 'Month',
+        ylab = 'Percent Return')
+title('Market vs. Best Last Period Returns')
+minor.tick(ny = 5)
+
+marketReturn <- sector.monthly$ReturnOfMarket / 100 + 1
+bestReturn <- sector.monthly$ReturnOfBestLastPeriod / 100 + 1
+marketReturn <- log(marketReturn)
+bestReturn <- log(bestReturn)
+
+# test whether
+t.test(bestReturn, marketReturn)
