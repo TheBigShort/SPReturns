@@ -196,40 +196,24 @@ plotVaR <- function (x, confidence = c(0.95, 0.995), ticker = '') {
   nmod <- function (x) dnorm(x, mean = m, sd = vol)
   
   # plot labels
-  cols <- c('purple', '#FF00FF')
+  cols <- c('deepskyblue1', '#FF00FF')
   title <- paste('Value at Risk', ticker, sep = ' ')
   hLabels <- paste(as.character(round(histVaR, 4) * 100), '%', sep = ' ')
   mLabels <- paste(as.character(round(modelVaR, 4) * 100), '%', sep = ' ')
-  labels <- seq(from = -0.1, to = 0.1, by = 0.025)
-  labels <- append(labels, histVaR)
-  labels <- append(labels, modelVaR)
-  labels <- sort(labels)
+  subtitle <- paste(confidence * 100, '%', collapse = ', ', sep = '')
+  title <- paste(title, subtitle, sep = '\n')
   
-  # plot densities
-  ggplot(x, aes(x, col = 'red', fill = 'red')) + 
-  labs(title = title, subtitle = 'Historical vs. Model') +
-    
-  # the historical return denisty
-  geom_density(alpha = 0.2, size = 1, col = cols[1], fill = cols[1], linetype = 2) +
-  
-  # the model density
-  stat_function(fun = nmod, alpha = 0.2, size = 1, col = cols[2], fill = cols[2], geom = 'area') +
-  
-  # historical VaR
-  geom_vline(xintercept = histVaR, linetype = 2, size = 1.3, col = cols) +
-  annotate('text', x = histVaR, y = 30, label = hLabels, angle = 90) +
-  
-  # model VaR
-  geom_vline(xintercept = modelVaR, size = 1.3, col = cols) +
-  annotate('text', x = modelVaR, y = 20, label = mLabels, angle = 90) +
-  
-  ylab('Density of Returns') +
-  xlab('% Return') +
-  xlim(qnorm(0.0001, mean = m, sd = vol), qnorm(0.9999, mean = m, sd = vol)) +
-  scale_x_continuous(breaks = labels, labels = round(labels * 100, 2)) +
-  scale_fill_manual(values = c('red', 'blue'), drop = FALSE) +
-  scale_color_manual(name = 'VaR Type', values = c(Historical = cols[1], Model = cols[2])) +
-  theme_light()
+  # plot chart
+  plot(density(x), lwd = 2, lty = 2, main = title, xlab = 'Returns')
+  polygon(density(x), col = adjustcolor(cols[1], alpha = 0.5))
+  s <- seq(min(x), max(x), by = 0.001)
+  polygon(x = s, y = nmod(s), lwd = 2, col = adjustcolor(cols[2], alpha = 0.5))
+  abline(v = histVaR, lty = 2, lwd = 2, col = cols[1])
+  abline(v = modelVaR, lty = 1, lwd = 2, col = cols[2])
+  text(histVaR, y = 20, labels = hLabels, srt = 90, font = 2, cex = 1.5)
+  text(modelVaR, y = 30, labels = mLabels, srt = 90, font = 2, cex = 1.5)
+  legend('topleft', legend = c('Historical', 'Model'), title = 'VaR Model', lwd = 2, lty = c(2, 1), col = c(cols[1], cols[2]))
+  minor.tick(nx = 4, ny = 10)
 }
   
 plotVaR(smp[,1], ticker = names(smp)[1])
