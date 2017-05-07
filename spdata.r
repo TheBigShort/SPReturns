@@ -74,11 +74,19 @@ ss <- apply(sector.returns, MARGIN = 2, sd)
 
 library(Hmisc)
 
+# prepare for barplot
+esm <- as.matrix(es[c(2,4),])
+
+# make names more readable
+colnames(esm) <- gsub('\\.', ' ', colnames(esm))
+
 # extrema
-barplot(es[c(2,4),], 
+barplot(esm,
         col = c('#0099cc', '#ccffcc'),
         lwd = 2,
+        beside = TRUE,
         xlab = 'Sector',
+        cex.names = 0.8,
         ylab = 'Standard Deviations',
         main = 'Extrema Distance from Mean in Standard Deviations')
 
@@ -102,13 +110,13 @@ barplot(ss,
 
 minor.tick(ny = 5, nx = 0)
 
-# rolling 20 day annualized volatility
+# rolling 60 day annualized volatility
 real.vol <- rollapply(sector.returns, width = 60, FUN = sd.annualized)
 real.vol <- na.omit(real.vol)
 cv <- real.vol[,1]
 
 plot(cv, 
-     main = 'Consumer Discretionary Realized Volatility',
+     main = 'Consumer Discretionary Realized Volatility (60 Day)',
      ylab = 'Daily Volatility')
 
 # is realized vol stationary?
@@ -116,57 +124,8 @@ library(tseries)
 adf.test(cv)
 
 # there's sufficient evidence to reject the null hypothesis
+#
 half <- length(cv) / 2
-
-# find delta vol by prediction
-# this forecasts a change in volatility
-fc <- c()
-for (t in (half + 1):(half+ 100)) {
-  acv <- arima(cv[1:t], order = c(1, 0, 0))
-  fc <- append(fc, predict(acv, n.ahead = 5)$pred[1])
-}
-
-deltavol <- fc - lag.xts(cv[(half + 1):length(cv)])
-realdelta <- diff(cv)
-
-
-
-##########################
-# Top Performers and Momentum
-##########################
-
-firstYear <- 1:250
-secondYear <- 251:500
-
-c.returns <- apply(sp.returns[firstYear,] + 1, MARGIN = 2, prod)
-c.returns <- sort(c.returns,decreasing = TRUE)
-best <- c.returns[1:20]
-best
-
-c.returns2 <- apply(sp.returns[secondYear,] + 1, MARGIN = 2, prod)
-best2 <- c.returns2[names(best)]
-best2
-
-# there is not enough evidence to reject the null
-# that the past performers will perform the same as the market
-t.test(best2, c.returns2)
-
-
-##########################
-# Worst Performers and Momentum
-##########################
-
-worst <- sort(c.returns)[1:5]
-worst
-
-worst2 <- c.returns2[names(worst)]
-worst2
-
-# there is not enough evidence to reject the null
-# that the worst past performers will perform the same as the market
-t.test(worst2, c.returns2)
-
-
 
 
 ##########################
@@ -195,7 +154,7 @@ hvar <- function (x, confidence = 0.95) {
 }
 
 # plot VaR types
-plotVaR <- function (x, confidence = c(0.95, 0.995), ticker = '') {
+plotVaR <- function (x, confidence = c(0.95, 0.995, 0.999), ticker = '') {
   modelVaR <- mvar(x, confidence)
   histVaR <- hvar(x, confidence)
   
@@ -218,8 +177,8 @@ plotVaR <- function (x, confidence = c(0.95, 0.995), ticker = '') {
   polygon(x = s, y = nmod(s), lwd = 2, col = adjustcolor(cols[2], alpha = 0.5))
   abline(v = histVaR, lty = 2, lwd = 2, col = cols[1])
   abline(v = modelVaR, lty = 1, lwd = 2, col = cols[2])
-  text(histVaR, y = 20, labels = hLabels, srt = 90, font = 2, cex = 1.5)
-  text(modelVaR, y = 30, labels = mLabels, srt = 90, font = 2, cex = 1.5)
+  text(histVaR, y = 20, labels = hLabels, srt = 90, font = 2, cex = 1.3)
+  text(modelVaR, y = 30, labels = mLabels, srt = 90, font = 2, cex = 1.3)
   legend('topleft', legend = c('Historical', 'Model'), title = 'VaR Model', lwd = 2, lty = c(2, 1), col = c(cols[1], cols[2]))
   minor.tick(nx = 4, ny = 10)
 }
@@ -273,7 +232,7 @@ rollingVaR <- function (v, confidence, days = 100, width = 60, garch = TRUE) {
             xlab = 'Trading Days', 
             ylab = 'Return')
   
-  title(paste('Rolling Model VaR', name, sep = ' '))
+  title(paste('Rolling Model VaR', name, paste(confidence * 100, '%', sep = ''), sep = ' '))
 
   segments(x0 = 1:nrow(df), y0 = 0,  y1 = df[,1])
   abline(h = 0)
@@ -339,6 +298,9 @@ for (i in names(sector.returns)) {
   l[[i]] <- monthlyReturns(sector.returns[,i])
 }
 
+months <- colnames(table.CalendarReturns(sector.returns[,1]))
+month <- months[-length(months)]
+
 sector.monthly <- as.data.frame(l)
 sector.monthly$ReturnOfMarket <- apply(sector.monthly, MARGIN = 1, mean)
 sector.monthly$Best <- colnames(sector.monthly)[apply(sector.monthly, MARGIN = 1, which.max)]
@@ -358,12 +320,14 @@ barplot(height = returnMatrix,
         xlab = 'Month',
         ylab = 'Percent Return')
 title('Market vs. Best Last Period Returns')
-minor.tick(ny = 5)
+minor.tick(ny = 5, nx=5)
 
 marketReturn <- sector.monthly$ReturnOfMarket / 100 + 1
 bestReturn <- sector.monthly$ReturnOfBestLastPeriod / 100 + 1
 marketReturn <- log(marketReturn)
 bestReturn <- log(bestReturn)
 
-# test whether
+# test whether there is a signifcant
+# difference in returns
 t.test(bestReturn, marketReturn)
+
